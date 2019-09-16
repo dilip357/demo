@@ -1,0 +1,60 @@
+
+<div class="form-group" style="">
+	<div class="form-group">
+		<label>Contact Point (IP)</label> <input type="text" id="contact-point"
+			class="form-control">
+	</div>
+	<div class="form-group">
+		<label>Port</label> <input type="number" id="host-port"
+			class="form-control">
+	</div>
+	<div class="form-group">
+		<label>Keyspace</label> <input type="text" id="keyspace"
+			class="form-control">
+	</div>
+</div>
+
+<script>
+
+	function getTemplate(inputMappings, outputFields) {
+		//alert("inputMappings:"+JSON.stringify(inputMappings))
+		//alert("outputFields:"+JSON.stringify(outputFields))
+		var template = {};
+		template.contactPoint = $('#contact-point').val();
+		template.hostPort = $('#host-port').val();
+		template.keyspace = $('#keyspace').val();
+		//console.log("getTemplate: template: " + JSON.stringify(template));
+		return template;
+	}
+
+	function setTemplate(template) {
+		//console.log("setTemplate: template: " + JSON.stringify(template));
+		if (template != null && template != undefined) {
+			if (template.contactPoint != undefined)
+				$('#contact-point').val(template.contactPoint);
+			if (template.hostPort != undefined)
+				$('#host-port').val(template.hostPort);
+			if (template.keyspace != undefined)
+				$('#keyspace').val(template.keyspace);
+		}
+	}
+
+	function validate() {
+		var cp=$('#contact-point').val().trim();
+		var port=$('#host-port').val().trim();
+		var keyspace=$('#keyspace').val().trim();
+		if(cp==''){
+			errorMessage("Contact point should not be empty","#contact-point");
+			return false;
+		}
+		if(port==''){
+			errorMessage("Port should not be empty","#host-port");
+			return false;
+		}
+		if(keyspace==''){
+			errorMessage("Keyspace should not be empty","#keyspace");
+			return false;
+		}
+		return true;
+	}
+</script>

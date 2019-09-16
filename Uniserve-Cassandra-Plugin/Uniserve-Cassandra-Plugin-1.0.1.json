@@ -1,0 +1,20 @@
+{
+    "name": "Uniserve Platform-CassandraPlugin",
+    "version":"1.0.0",
+    "description": "",
+ "repository": {
+        "type": "git",
+        "url": "https://intense.in"
+    },
+
+    "author": "The Uniserve Platform Team",
+    "license": {
+            "type": "Apache",
+            "url": "https://intense.in"
+        },
+    "homepage": "https://intense.in",
+    "keywords": [
+        "bundles"       
+    ]
+}
+

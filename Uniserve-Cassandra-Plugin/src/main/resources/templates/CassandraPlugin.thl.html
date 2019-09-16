@@ -1,0 +1,694 @@
+<style>
+.my-editor-css {
+	padding: 6px 12px !important;
+	height: 80px !important;
+	min-height: 80px !important;
+	max-height: 250px !important;
+	box-shadow: 0px 0px 0px #ccc !important;
+}
+
+.my-editor-css-expand {
+	height: 220px !important;
+}
+
+.selected-suggestion {
+	color: #fff;
+	background-color: #666;
+}
+
+* {
+	outline: none;
+}
+</style>
+<div class="MainContainer">
+	<div class="row">
+		<div class="col-md-12">
+			<h4>Cassandra Plugin v-1.0.1</h4>
+			<hr>
+			<marquee class="text-info" onmouseover="this.stop();"
+				onmouseout="this.start();"> Information: Fetch columns to
+				get the suggestions in the query field, then use Ctrl+Space to get
+				the tables and Ctrl+Shift+Space to get the columns.</marquee>
+		</div>
+	</div>
+	<div id="first-part">
+		<div class="row" style="margin-top: 5px;">
+			<div class="col-md-6">
+				<label>Datasource </label> <select id="datasource"
+					onchange="onDatasourceChanged()" class="form-control"
+					style="height: 30px;">
+				</select>
+			</div>
+			<div class="col-md-6">
+				<label>Query type </label> <select id="query-type"
+					onchange="$('#text-editor-100').focus();" class="form-control"
+					style="height: 30px;">
+					<option value="create">Create</option>
+					<option value="insert">Insert</option>
+					<option value="select">Select</option>
+					<option value="update">Update</option>
+					<option value="delete">Delete</option>
+				</select>
+			</div>
+		</div>
+		<div class="row">
+			<div class="col-md-12">
+				<label>Table/Column family</label>
+			</div>
+			<div class="col-md-9">
+				<select id="table-list"
+					data-placeholder="Select required table/column family"
+					class="form-control">
+				</select>
+			</div>
+			<div class="col-md-3">
+				<button class="btn-default btn-sm" onclick="fetchColumns(true)">Fetch
+					columns</button>
+			</div>
+		</div>
+	</div>
+	<div class="" id="second-part">
+		<div class="col-md-12" style="margin-top: 10px;">
+			<button class="btn-default btn-sm pull-right" title="expand editor"
+				onclick="expandCollapseQE(this)">
+				<i class="fa fa-expand"></i>
+			</button>
+			<label>Query</label>
+			<div id="dbquery-editor-container"></div>
+		</div>
+	</div>
+</div>
+<script type="text/javascript">
+	///////////////////////////////TEXT-EDITOR PLUGIN CODE START//////////////////////////////////////
+	(function($) {
+		var $suggestionBox, $editor;
+		var caretPos = 0;
+		var allowed = true;
+		var defaultOptions = {
+			"callback" : {
+				"onblur" : ""
+			},
+			"placeholder" : "Enter your text here",
+			"editor" : {
+				"cssClass" : "",
+				"style" : {
+					"border" : "1px solid #ccc",
+					"height" : "200px",
+					"width" : "100%",
+					"min-height" : "200px",
+					"max-height" : "200px",
+					"overflow-y" : "auto",
+					"overflow-x" : "hidden",
+					"box-shadow" : "0px 0px 2px #ccc"
+				}
+			},
+			"box" : {
+				"cssClass" : "",
+				"style" : {
+					"border" : "2px solid #ccc",
+					"position" : "absolute",
+					"background-color" : "#fff",
+					"z-index" : "999999",
+					"height" : "100px",
+					"max-height" : "100px",
+					"overflow-y" : "auto",
+					"width" : "300px",
+					"display" : "none",
+					"box-shadow" : "2px 3px 5px #999"
+				}
+			}
+
+		};
+
+		function setOptions_(options) {
+			var placeholder = "";
+			var editorCssClass = "";
+			var boxCssClass = "";
+			var editorCss = defaultOptions.editor.style;
+			var boxCss = defaultOptions.box.style;
+			if (options != undefined && typeof options === 'object') {
+				if (options.hasOwnProperty("placeholder")) {
+					placeholder = options.placeholder;
+				}
+				if (options.hasOwnProperty("callback")) {
+					defaultOptions.callback = options.callback;
+				}
+				if (options.hasOwnProperty("editor")) {
+					if (options.editor.hasOwnProperty("cssClass")) {
+						editorCssClass = options.editor.cssClass;
+					}
+					if (options.editor.hasOwnProperty("style")) {
+						if (typeof options.editor.style === 'object') {
+							editorCss = $.extend({}, editorCss,
+									options.editor.style);
+							editorCss["min-height"] = editorCss["height"];
+						}
+					}
+				}
+				if (options.hasOwnProperty("box")) {
+					if (options.box.hasOwnProperty("cssClass")) {
+						boxCssClass = options.box.cssClass;
+					}
+					if (options.box.hasOwnProperty("style")) {
+						if (typeof options.box.style === 'object') {
+							boxCss = $.extend({}, boxCss, options.box.style);
+						}
+					}
+				}
+			}
+			// alert("editorCss: "+JSON.stringify(editorCss));
+			// alert("boxCss: "+JSON.stringify(boxCss));
+			try {
+				$editor.css(editorCss).addClass(editorCssClass).attr(
+						"placeholder", placeholder);
+				$suggestionBox.css(boxCss).addClass(boxCssClass);
+			} catch (e) {
+			}
+		}
+
+		function addListeners_() {
+			$(".SuggestionBox").on('keydown', function(e) {
+				// alert('yes')
+				if (e.keyCode == 13) {
+					e.preventDefault();
+				}
+			});
+			$(".SuggestionBox")
+					.on(
+							'keydown click dblclick',
+							'li',
+							function(e) {
+								// alert(1);
+								// alert(e.type)
+								if (e.keyCode == 13) {
+									e.preventDefault();
+								}
+								$this = $(this);
+								var $editor = $(".TextEditor");
+								if (e.keyCode == 27) {
+									$suggestionBox.hide();
+									$editor.focus();
+								} else if (e.keyCode == 40) {// down arrow key
+									if (!$this.is(':last-child')) {
+										$this.next().focus().addClass(
+												"selected-suggestion");
+										$this
+												.removeClass("selected-suggestion");
+									}
+									return false;
+								} else if (e.keyCode == 38) {// up arrow key
+									if (!$this.is(':first-child')) {
+										$this.prev().focus().addClass(
+												"selected-suggestion");
+										$this
+												.removeClass("selected-suggestion");
+									}
+									return false;
+								} else if (e.keyCode == 13
+										|| e.type == 'dblclick') {// enter
+									// key
+									var selectedVal = $this.text();
+									$suggestionBox.hide();
+									// alert("caretPos:"+caretPos)
+									$suggestionBox.parent().textEditor(
+											"insertValue", selectedVal,
+											caretPos, false);
+									return;
+
+								} else if (e.type == 'click') {
+									$this.siblings().removeClass(
+											"selected-suggestion");
+									$this.focus().addClass(
+											"selected-suggestion");
+								}
+							}).find('li').first().focus();
+
+			$(".TextEditor").on(
+					"keydown click",
+					function(e) {
+						$(this).textareaHelper();
+						var evtobj = window.event ? event : e;
+						var tagName = e.target.tagName;
+						var ele = e.target;
+						var $box = $(this).next().next();
+						$box.hide();
+						if (evtobj.keyCode == 13) {
+							evtobj.preventDefault();
+							return;
+						} else if (evtobj.ctrlKey && evtobj.shiftKey
+								&& evtobj.keyCode == 32) {
+							$box.html(columnSuggestions);
+							var contentHeight = $(this)
+									.textareaHelper('height')
+							$(this).height(contentHeight);
+							// Follow the caret arounbd.
+							caretPos = $(this).textareaHelper(
+									'getOriginalCaretPos');
+							var pos = $(this).textareaHelper('caretPos');
+							pos.left = pos.left + 16;
+							pos.top = pos.top + 50;
+							$box.css(pos).show().find(".selected-suggestion")
+									.focus();
+						} else if (evtobj.ctrlKey && evtobj.keyCode == 32) {
+							$box.html(tableSuggestions);
+							var contentHeight = $(this)
+									.textareaHelper('height')
+							$(this).height(contentHeight);
+							// Follow the caret arounbd.
+							caretPos = $(this).textareaHelper(
+									'getOriginalCaretPos');
+							var pos = $(this).textareaHelper('caretPos');
+							pos.left = pos.left + 16;
+							pos.top = pos.top + 50;
+							$box.css(pos).show().find(".selected-suggestion")
+									.focus();
+						}
+					});
+			$(".TextEditor").focusout(function() {
+				var onblurcallback = defaultOptions.callback.onblur;
+				var element = $(this);
+				if (element.text() && !element.text().replace(" ", "").length) {
+					element.empty();
+				}
+				if (onblurcallback && onblurcallback != "")
+					window[onblurcallback]($editor.html());
+			});
+		}
+
+		var methods = {
+
+			init : function(options) {
+				var html = '<div style="border: 1px solid #ccc" contenteditable="true" spellcheck="false" placeholder="" id="text-editor-100" class="TextEditor" tabindex="0"></div>'
+						+ '<div id="suggestion-box-component" class="SuggestionBox" tabindex="0">No suggestions</div>';
+				$(this).html(html);
+				$editor = $(this).find(".TextEditor");
+				$suggestionBox = $(this).find(".SuggestionBox");
+				setOptions_(options);
+				addListeners_();
+				return this;
+			},
+
+			addClass : function(editorCssClass) {
+				$editor.addClass(editorCssClass)
+			},
+
+			removeClass : function(editorCssClass) {
+				$editor.removeClass(editorCssClass)
+			},
+
+			disable : function() {
+				$editor.attr("disabled", "disabled");
+			},
+			value : function(val) {
+				var el = $(this).find(".TextEditor")[0];
+				try {
+					if (val) {
+						el.focus();
+						$editor.html(val).focus();
+						var range = document.createRange();
+						var sel = window.getSelection();
+						range.setStart(el.childNodes[0], val.length);
+						range.collapse(true);
+						sel.removeAllRanges();
+						sel.addRange(range);
+					}
+				} catch (e) {
+					// TODO: handle exception
+				}
+				return document.querySelector('[contenteditable]').textContent;
+			},
+			insertValue : function(val, pos, ignore) {
+				var el = $(this).find(".TextEditor")[0];
+				el.focus();
+				if (val && pos != undefined) {
+					var contents = document.querySelector('[contenteditable]').textContent;
+					caretPos = pos + val.length;
+					contents = contents.slice(0, pos) + val
+							+ contents.slice(pos);
+					$editor.html(contents).focus();
+					var range = document.createRange();
+					var sel = window.getSelection();
+					range.setStart(el.childNodes[0], caretPos);
+					range.collapse(true);
+					sel.removeAllRanges();
+					sel.addRange(range);
+				}
+			},
+			suggestions : function(suggestions) {
+				$(this).find(".SuggestionBox").html(suggestions);
+				addListeners_();
+				return this;
+			}
+		};
+
+		$.fn.textEditor = function(methodOrOptions) {
+			if (methods[methodOrOptions]) {
+				return methods[methodOrOptions].apply(this,
+						Array.prototype.slice.call(arguments, 1));
+			} else if (typeof methodOrOptions === 'object' || !methodOrOptions) {
+				// Default to "init"
+				return methods.init.apply(this, arguments);
+			} else {
+				$.error('Method ' + methodOrOptions
+						+ ' does not exist on jQuery.textEditor');
+			}
+		};
+	})(jQuery);
+	///////////////////////////////TEXT-EDITOR PLUGIN CODE END//////////////////////////////////////
+
+	var dsList = [], tableList = [], columnList = [];
+	var tables = null;
+	var queryEditor;
+	var tableSuggestions = "", columnSuggestions = "";
+
+	var options = {
+		"callback" : {
+			"onblur" : "validateQuery"
+		},
+		"placeholder" : "Enter your query here",
+		"editor" : {
+			"cssClass" : "my-editor-css"
+		}
+	};
+	queryEditor = $("#dbquery-editor-container").textEditor(options);
+
+	var dslist = ecs('DatasourceService', 'getDataSourceListByType', {
+	
+		"dsType" : "CassandraSource"
+	});
+	if (dslist) {
+		if (dslist.length > 0) {
+			var options = $("#datasource");
+			$.each(dslist, function() {
+				options.append($("<option />").val(this.DS_ID).text(
+						this.DS_NAME));
+			});
+			$("#datasource").change();
+		} else {
+			errorMessage("Please define CassandraSource in Resources first");
+		}
+	} else {
+		errorMessage("Unable to load CassandraSource list");
+	}
+
+	function onDatasourceChanged() {
+		var datasourceId = $('#datasource').val();
+		tableList = ecs('CassandraSource', 'getTableList', {
+			"dsId" : datasourceId
+		});
+		//$("#table-list").empty();
+		var multiSelect = $("#table-list").data("kendoMultiSelect");
+		if (multiSelect == undefined) {
+			$("#table-list").kendoMultiSelect({
+				dataTextField : "name",
+				dataValueField : "name",
+				dataSource : tableList
+			});
+		} else {
+			multiSelect.setDataSource(tableList);
+		}
+		setTableSuggestions();
+		if (tables != null) {
+			$("#table-list").data("kendoMultiSelect").value(tables);
+			fetchColumns();
+		}
+	}
+
+	function fetchColumns(showerrormsg) {
+		var datasourceId = $('#datasource').val();
+		var tables = $("#table-list").data("kendoMultiSelect").value();
+		if (showerrormsg == true && tables == "") {
+			errorMessage("Please select atleast one table/column family");
+			return;
+		}
+		if (tables != "") {
+			columnList = ecs('CassandraSource', 'getColumnList', {
+				"dsId" : datasourceId,
+				"tableNames" : tables
+			});
+			successMessage("Columns fetched successfully");
+			setColumnSuggestions();
+		}
+	}
+
+	function expandCollapseQE(ele) {
+		var $i = $(ele).find("i");
+		if ($i.hasClass("fa-expand")) {
+			$i.removeClass("fa-expand").addClass("fa-compress");
+			$(ele).attr("title", "collapse editor");
+			$("#first-part").slideUp();
+			queryEditor.textEditor("addClass", "my-editor-css-expand");
+		} else {
+			$i.removeClass("fa-compress").addClass("fa-expand");
+			$(ele).attr("title", "expand editor");
+			$("#first-part").slideDown();
+			queryEditor.textEditor("removeClass", "my-editor-css-expand");
+		}
+	}
+
+	function validateQuery() {
+		var queryType = $('#query-type').val();
+		var Qry = queryEditor.textEditor("value").trim().toLowerCase();
+
+		if (Qry != "" && Qry.startsWith(queryType) == false) {
+			errorMessage("Please enter " + queryType + " query");
+		}
+	}
+
+	function getFieldType(field) {
+		var type = null;
+		$.each(columnList, function(i, column) {
+			if (column.name == field) {
+				type = column.type;
+				return;
+			}
+		});
+		return type;
+	}
+	function getQueryTemplate(inputMappings, outputFields) {
+		//alert("inputMappings:"+JSON.stringify(inputMappings))
+		//alert("outputFields:"+JSON.stringify(outputFields))
+
+		var datasourceId = $('#datasource').val();
+		var queryType = $('#query-type').val();
+		
+			//var Qry = queryEditor.textEditor("value").trim();
+			var Qry = (queryEditor.textEditor("value").trim()).replace(/\u00a0/g, " ");
+		
+
+		var tables = $("#table-list").data("kendoMultiSelect").value();
+
+		var template = {};
+		template.datasourceId = datasourceId;
+		template.queryType = queryType;
+		template.tables = tables;
+		template.query = Qry;
+		template.inputs = [];
+		template.outputs = [];
+		var fields = [];
+		if (queryType == 'create') {
+			template.enableBulkOption = false;
+		} else if (queryType == 'select') {
+			template.enableBulkOption = false;
+			if (Qry.toUpperCase().indexOf('WHERE') != -1) {
+				var substrQry = Qry.substring(Qry.toUpperCase()
+						.indexOf('WHERE')
+						+ 'WHERE'.length);
+				fields = getFieldsFromQuery(substrQry);
+			}
+			$.each(fields, function(i, field) {
+				var dataType = getFieldType(field);
+				if (dataType == null) {
+					dataType = "string";
+					for (var j = 0; j < inputMappings.length; j++) {
+						if (inputMappings[j].name.toUpperCase() == field
+								.toUpperCase()) {
+							dataType = inputMappings[j].dataType;
+							break;
+						}
+					}
+				}
+				var column = {
+					"name" : field,
+					"type" : dataType
+				};
+				template.inputs.push(column);
+			});
+
+			fields = getOutputFieldsFromQuery(Qry);
+			$.each(fields, function(i, field) {
+				var dataType = getFieldType(field);
+				if (dataType == null) {
+					dataType = "string";
+					for (var j = 0; j < outputFields.length; j++) {
+						if (outputFields[j].name.toUpperCase() == field
+								.toUpperCase()) {
+
+							dataType = outputFields[j].type;
+							break;
+						}
+					}
+				}
+				var column = {
+					"name" : field,
+					"type" : dataType
+				};
+				template.outputs.push(column);
+			});
+		} else if (queryType == 'insert') {
+			fields = [];
+			var flds = Qry.substring(Qry.indexOf("(") + 1, Qry.indexOf(")"))
+					.trim().split(",");
+			var values = Qry.substring(
+					Qry.indexOf("(", Qry.toUpperCase().indexOf("VALUES")) + 1,
+					Qry.indexOf(")", Qry.toUpperCase().indexOf("VALUES")))
+					.trim().split(",");
+			for (i = 0; i < flds.length; i++) {
+				if (values[i].trim() == '?') {
+					fields.push(flds[i]);
+				}
+			}
+			$.each(fields, function(i, field) {
+				var dataType = getFieldType(field);
+				if (dataType == null) {
+					dataType = "string";
+					for (var j = 0; j < inputMappings.length; j++) {
+						if (inputMappings[j].name.toUpperCase() == field
+								.toUpperCase()) {
+							dataType = inputMappings[j].dataType;
+							break;
+						}
+					}
+				}
+				var column = {
+					"name" : field,
+					"type" : dataType
+				};
+				template.inputs.push(column);
+			});
+		} else if (queryType == 'update') {
+			fields = getFieldsToBeUpdatedFromQuery(Qry);
+			$.each(fields, function(i, field) {
+				var dataType = getFieldType(field);
+				if (dataType == null) {
+					dataType = "string";
+					for (var j = 0; j < inputMappings.length; j++) {
+						if (inputMappings[j].name.toUpperCase() == field
+								.toUpperCase()) {
+							dataType = inputMappings[j].dataType;
+							break;
+						}
+					}
+				}
+				var column = {
+					"name" : field,
+					"type" : dataType
+				};
+				template.inputs.push(column);
+			});
+
+			fields = [];
+			if (Qry.toUpperCase().indexOf('WHERE') != -1) {
+				var substrQry = Qry.substring(Qry.toUpperCase()
+						.indexOf('WHERE')
+						+ 'WHERE'.length);
+				fields = getFieldsFromQuery(substrQry);
+			}
+
+			$.each(fields, function(i, field) {
+				var dataType = getFieldType(field);
+				if (dataType == null) {
+					dataType = "string";
+					for (var j = 0; j < inputMappings.length; j++) {
+						if (inputMappings[j].name.toUpperCase() == field
+								.toUpperCase()) {
+							dataType = inputMappings[j].dataType;
+							break;
+						}
+					}
+				}
+				var column = {
+					"name" : field,
+					"type" : dataType
+				};
+				template.inputs.push(column);
+			});
+
+		} else if (queryType == 'delete') {
+			fields = getFieldsFromQuery(Qry);
+			$.each(fields, function(i, field) {
+				var dataType = getFieldType(field);
+				if (dataType == null) {
+					dataType = "string";
+					for (var j = 0; j < inputMappings.length; j++) {
+						if (inputMappings[j].name.toUpperCase() == field
+								.toUpperCase()) {
+							dataType = inputMappings[j].dataType;
+							break;
+						}
+					}
+				}
+				var column = {
+					"name" : field,
+					"type" : dataType
+				};
+				template.inputs.push(column);
+			});
+		}
+
+		console.log("getQueryTemplate: template: " + JSON.stringify(template));
+		return template;
+	}
+
+	function setQueryTemplate(template) {
+		console.log("setQueryTemplate: template: " + JSON.stringify(template));
+		if (template != null && template != undefined) {
+			if (template.datasourceId != undefined)
+				$('#datasource').val(template.datasourceId).change();
+			if (template.queryType != undefined)
+				$('#query-type').val(template.queryType);
+			if (template.query != undefined) {
+				
+				//queryEditor.textEditor("value", template.query);
+				queryEditor.textEditor("value", (template.query).replace(/\u00a0/g, " "));
+			}
+			if (template.tables != undefined) {
+				tables = template.tables;
+				$("#table-list").data("kendoMultiSelect").value(tables);
+				fetchColumns();
+			}
+		}
+	}
+
+	function setTableSuggestions(values) {
+		var isTable = false;
+		if (values == undefined) {
+			values = tableList;
+			isTable = true;
+		}
+		var suggestions = "No suggestions";
+		if (values.length > 0) {
+			suggestions = '<ul class="list-group">';
+			for (var i = 0; i < values.length; i++) {
+				var displayName = values[i].name;
+				if (i == 0)
+					suggestions += '<li class="list-group-item selected-suggestion" tabindex="'
+							+ (i + 1) + '">' + displayName + '</li>';
+				else
+					suggestions += '<li class="list-group-item" tabindex="'
+							+ (i + 1) + '">' + displayName + '</li>';
+			}
+			suggestions += '</ul>';
+		}
+		if (isTable) {
+			tableSuggestions = suggestions;
+		} else {
+			columnSuggestions = suggestions;
+		}
+	}
+
+	function setColumnSuggestions() {
+		setTableSuggestions(columnList);
+	}
+</script>
+

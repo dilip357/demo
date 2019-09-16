@@ -1,0 +1,115 @@
+<!--
+  #%L
+  Uniserve-Platform
+  %%
+  Copyright (C) 2014 - 2015 In10S
+  %%
+  INTELLECTUAL PROPERTY RIGHTS.
+  
+   All titles and intellectual property rights in and to the "Product" 
+   (including but not limited to any images, photographs, animations, 
+   video, audio, music, text,source, "applets" etc. incorporated into the "Product"),
+   and any copies you are permitted to make herein are owned by Intense Technologies Limted (IN10S).
+   or its subsidiary. All titles and intellectual property rights in and to the 
+   content which may be accessed through use of the "Product" is the 
+   property of the respective content owner and may be protected by 
+   applicable copyright or other intellectual property laws and treaties.  
+   This "Agreement" grants you no rights to use such content. If this 
+   "Product" contains documentation that is provided only in electronic form, 
+   you may print one copy of such electronic documentation.  
+   You may not copy the printed materials accompanying the "Product". 
+  
+  Please refer to the complete license.
+  
+            For inquiries please contact: 
+              Intense Technologies LIMITED
+              A1,Vikrampuri,Secunderabad-9.INDIA.
+              Fax: 91-40-27819040
+              E-mail:info@intense.in or info@In10stech.com
+  #L%
+  -->
+<!DOCTYPE html>
+<html>
+<head>
+<title>Uniserve Platform - Route not found</title>
+<style>
+html, body, pre {
+	margin: 0;
+	padding: 0;
+	font-family: Monaco, 'Lucida Console', monospace;
+	background: #ECECEC;
+}
+
+h1 {
+	margin: 0;
+	background: #AD632A;
+	padding: 20px 45px;
+	color: #fff;
+	text-shadow: 1px 1px 1px rgba(0, 0, 0, .3);
+	border-bottom: 1px solid #9F5805;
+	font-size: 28px;
+}
+
+p#detail {
+	margin: 0;
+	padding: 15px 45px;
+	background: #F6A960;
+	border-top: 4px solid #D29052;
+	color: #733512;
+	text-shadow: 1px 1px 1px rgba(255, 255, 255, .3);
+	font-size: 14px;
+	border-bottom: 1px solid #BA7F5B;
+}
+
+h2 {
+	margin: 0;
+	padding: 5px 45px;
+	font-size: 12px;
+	background: #333;
+	color: #fff;
+	text-shadow: 1px 1px 1px rgba(0, 0, 0, .3);
+	border-top: 4px solid #2a2a2a;
+}
+
+.routes {
+	margin: 0;
+	text-shadow: 1px 1px 1px rgba(255, 255, 255, .5);
+	position: relative;
+	font-size: 12px;
+	overflow: hidden;
+	margin-top: 15px;
+}
+
+div.route {
+	text-shadow: 1px 1px 1px rgba(255, 255, 255, .5);
+	font-weight: bold;
+	border-bottom: 1px solid #DDD;
+	padding: 10px;
+	padding-left: 50px;
+}
+</style>
+</head>
+<body>
+	<h1>No route found</h1>
+
+	<p id="detail">
+		For request
+		<code th:text="${method}">METHOD</code>
+		&nbsp;
+		<code th:text="${uri}">URL</code>
+	</p>
+
+
+	<h2>These routes have been tried, in this order:</h2>
+
+	<div class="routes">
+		<div class="route" th:each="route : ${routes}">
+			<span th:text="${route.getHttpMethod()} + '&nbsp;' + ${route.url}">METHOD
+				URL</span>&nbsp;=>&nbsp;<span
+				th:utext="${route.getControllerClass().getName()} + '&#35;' + ${route.getControllerMethod().getName()}">method</span>
+		</div>
+	</div>
+
+
+</body>
+</html>
